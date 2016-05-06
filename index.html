@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+  <head>
+    <title>CHAT</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      #send { width: 11%; background: rgb(130, 224, 255); border: none; height: 40px;}
+      #bottomfield {display: inline-block; width: 89%; background: yellow; padding: 1px; position: fixed; bottom: 0; width: 100%; border: 0; margin-right: .5%; }
+      #name {width: 10%; height: 40px;}
+      #m {width: 78%; height: 40px;}
+      #messages, #peeps { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+      #onlinepeeps {float: right; z-index: 2; top: 5px; right: 5px; position: fixed; display: inline-block;}
+    </style>
+  </head>
+  <body>
+    <ul id="messages"></ul>
+    <div id="bottomfield">
+      <div id='typing'></div>
+      <input id="name" placeholder="your name here"></input>
+      <input id="m" autocomplete="off"></input>
+      <button id="send">Send</button>
+    </div>
+    <div id="onlinepeeps">
+      People Online
+      <ul id="peeps"></ul>
+    </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+
+  <script>
+    var socket = io();
+    var name;
+    var newuser = true;
+    window.onload = function(){
+      name = prompt('whats your name ?');
+      socket.emit('new user', name);
+      $('#name').val(name);
+    };
+
+    window.onbeforeunload = function(evt) {
+        var message = 'thank you for using this chat';
+        socket.emit('end',name);
+        return message;
+    };
+
+    $('#m').keypress(function(e){
+      socket.emit('typing',name);
+    });
+
+    $('#send').click(function(){
+      if($('#name').val() != ''){
+        socket.emit('chat message', {msg : $('#m').val(), name : $('#name').val()});
+        $('#m').val('');
+        return false;
+      }
+      else{
+        alert('enter name');
+      }
+    });
+
+    socket.on('chat message', function(msg){
+      $('#messages').append($('<li>').text(msg.name+' : '+msg.msg));
+    });
+
+    socket.on('peopleonline', function(onlinenames){
+      $('#peeps').empty();
+      onlinenames.forEach(function(n){
+        $('#peeps').append($('<li>').text(n));
+      })
+    });
+
+    socket.on('typing', function(typer){
+      if(typer != name){
+        setTimeout(function(){
+            $('#typing').text('');
+        },5000);
+        $('#typing').text(typer+' is typing ...');
+      }
+    });
+
+    socket.on('old messages', function(oldmessages){
+      if(newuser){
+        oldmessages.forEach(function(msg){
+          $('#messages').append($('<li>').text(msg[0]+' : '+msg[1]));
+        });
+        newuser = false;
+      }
+    });
+
+  </script>
+
+  </body>
+</html>
