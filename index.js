@@ -8,28 +8,31 @@ var assert = require('assert');
 
 var url = 'mongodb://localhost:27017/chat';
 
-// MongoClient.connect(url, function(err, db) {
-//   assert.equal(null, err);
-//   console.log("Connected correctly to server.");
-//   db.close();
-// });
-
 app.get('/', function(req, res){
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-var peopleonline = [];  
-var messages = [];
+var peopleonline = [];
 
-io.on('connection', function(socket){
-	
-	io.emit('old messages',messages);
+io.on('connection', function(socket){	
+
+	MongoClient.connect(url, function(err, db) {
+	  assert.equal(null, err);
+	  getmessages(db, function() {
+	      db.close();
+	  });
+	});
 
 	socket.send(socket.id);
 
 	socket.on('chat message', function(msg){
 		io.emit('chat message',{'msg': msg.msg, 'name':msg.name});
-		messages.push([msg.name, msg.msg]);
+		MongoClient.connect(url, function(err, db) {
+		  assert.equal(null, err);
+		  insertmessage(db,msg.name,msg.msg, function() {
+		      db.close();
+		  });
+		});
 	});
 
 	socket.on('new user',function(name){
@@ -51,24 +54,31 @@ io.on('connection', function(socket){
 
 });
 
-MongoClient.connect(url, function(err, db) {
-  assert.equal(null, err);
-  chat(db,'ali','bye', function() {
-      db.close();
-  });
-});
 
 
-var chat = function(db,name,msg, callback) {
-  var content = {};
-  content[name] = [msg,new Date()];
+
+var insertmessage = function(db,name,msg, callback) {
    db.collection('chat').insertOne( {
-      content[name]
+      name:name, msg:msg, time: new Date()
    }, function(err, result) {
     assert.equal(err, null);
     console.log("Inserted a document into the restaurants collection.");
     callback();
   });
+};
+
+var getmessages = function(db, callback) {
+   var messages = [];
+   var cursor =db.collection('chat').find();
+   cursor.each(function(err, doc) {
+      assert.equal(err, null);
+      if (doc != null) {
+         messages.push([doc.name, doc.msg]);
+      } else {
+   		 io.emit('old messages',messages);
+         callback();
+      }
+   });
 };
 
 
